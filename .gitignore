@@ -1,0 +1,33 @@
+# Dataset (too large for git)
+Trash-ICRA19/
+*.zip
+
+# Training runs
+runs/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+venv/
+*.egg-info/
+
+# Weights
+*.pt
+*.pth
+*.onnx
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Report PDFs/PPT generated
+report/*.pdf
+report/*.pptx
+
+# wandb
+wandb/

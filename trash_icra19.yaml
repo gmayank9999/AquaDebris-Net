@@ -1,0 +1,17 @@
+# Trash-ICRA19 Dataset Configuration
+# Following: Zhu et al., "YOLOv8-C2f-Faster-EMA" (Sensors, 2024)
+# Dataset: University of Minnesota / JAMSTEC deep-sea ROV footage
+
+path: C:/Users/Dr-Prashantkumar/Desktop/Mayank/AquaDebris_Net/Trash-ICRA19
+train: images/train
+val: images/val
+test: images/test
+
+# Number of classes
+nc: 3
+
+# Class names (same as original paper)
+names:
+  0: plastic
+  1: bio
+  2: rov
