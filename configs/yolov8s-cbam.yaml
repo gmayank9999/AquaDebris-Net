@@ -1,0 +1,49 @@
+# Model B: YOLOv8s + CBAM
+# AquaDebris-Net ablation — adds channel+spatial attention at P4 and P5 levels.
+#
+# CBAM (Woo et al., ECCV 2018) is inserted after the C2f blocks at backbone
+# layers 6 (P4/16) and 9 (P5/32). The neck skip-connections still draw from
+# the pre-CBAM C2f outputs (layers 6 and 4) to preserve original feature paths.
+#
+# Compared to standard yolov8.yaml:
+#   - backbone grows from 10 → 12 layers (two CBAM inserts)
+#   - head concat indices shift: 6→6, 4→4, 12→14, 9→11
+#   - Detect indices: 15→17, 18→20, 21→23
+
+nc: 3
+scales:
+  s: [0.33, 0.50, 1024]
+
+backbone:
+  # [from, repeats, module, args]
+  - [-1, 1, Conv, [64, 3, 2]]          # 0  P1/2
+  - [-1, 1, Conv, [128, 3, 2]]         # 1  P2/4
+  - [-1, 3, C2f, [128, True]]          # 2
+  - [-1, 1, Conv, [256, 3, 2]]         # 3  P3/8
+  - [-1, 6, C2f, [256, True]]          # 4  P3 features (neck skip)
+  - [-1, 1, Conv, [512, 3, 2]]         # 5  P4/16
+  - [-1, 6, C2f, [512, True]]          # 6  P4 features (neck skip, pre-CBAM)
+  - [-1, 1, CBAM, [512]]               # 7  CBAM @ P4
+  - [-1, 1, Conv, [1024, 3, 2]]        # 8  P5/32
+  - [-1, 3, C2f, [1024, True]]         # 9
+  - [-1, 1, CBAM, [1024]]              # 10 CBAM @ P5
+  - [-1, 1, SPPF, [1024, 5]]           # 11 P5 features (neck PAN skip)
+
+head:
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]  # 12  upsample P5
+  - [[-1, 6], 1, Concat, [1]]                    # 13  cat P4 C2f (layer 6)
+  - [-1, 3, C2f, [512]]                          # 14
+
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]  # 15  upsample P4
+  - [[-1, 4], 1, Concat, [1]]                    # 16  cat P3 C2f (layer 4)
+  - [-1, 3, C2f, [256]]                          # 17  P3/8-small  ← detect
+
+  - [-1, 1, Conv, [256, 3, 2]]                   # 18  downsample P3
+  - [[-1, 14], 1, Concat, [1]]                   # 19  cat head P4 (layer 14)
+  - [-1, 3, C2f, [512]]                          # 20  P4/16-medium ← detect
+
+  - [-1, 1, Conv, [512, 3, 2]]                   # 21  downsample P4
+  - [[-1, 11], 1, Concat, [1]]                   # 22  cat SPPF (layer 11)
+  - [-1, 3, C2f, [1024]]                         # 23  P5/32-large  ← detect
+
+  - [[17, 20, 23], 1, Detect, [nc]]              # 24  Detect(P3, P4, P5)

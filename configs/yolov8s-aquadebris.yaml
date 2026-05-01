@@ -1,0 +1,51 @@
+# Model D: AquaDebris-Net (Full) — YOLOv8s + CBAM + DCNv2 + CARAFE
+# The complete proposed architecture combining all three modifications.
+#
+# CARAFE replaces the two nn.Upsample layers in the FPN neck (layers 12 and 15).
+# For each output pixel, CARAFE predicts a content-aware reassembly kernel
+# rather than simply repeating the nearest pixel. This preserves fine details
+# of small debris fragments during feature upsampling.
+#
+# Backbone: identical to yolov8s-cbam-dcn.yaml
+# Head:     nn.Upsample → CARAFE at layers 12 and 15 only.
+#           All concat indices unchanged vs cbam-dcn.
+
+nc: 3
+scales:
+  s: [0.33, 0.50, 1024]
+
+backbone:
+  # [from, repeats, module, args]
+  - [-1, 1, Conv, [64, 3, 2]]          # 0  P1/2
+  - [-1, 1, Conv, [128, 3, 2]]         # 1  P2/4
+  - [-1, 3, C2f, [128, True]]          # 2
+  - [-1, 1, Conv, [256, 3, 2]]         # 3  P3/8
+  - [-1, 6, C2f, [256, True]]          # 4  P3 features
+  - [-1, 1, Conv, [512, 3, 2]]         # 5  P4/16
+  - [-1, 6, C2f_DCN, [512, True]]      # 6  P4 deformable
+  - [-1, 1, CBAM, [512]]               # 7  CBAM @ P4
+  - [-1, 1, Conv, [1024, 3, 2]]        # 8  P5/32
+  - [-1, 3, C2f_DCN, [1024, True]]     # 9  P5 deformable
+  - [-1, 1, CBAM, [1024]]              # 10 CBAM @ P5
+  - [-1, 1, SPPF, [1024, 5]]           # 11
+
+head:
+  - [-1, 1, CARAFE, [512]]             # 12  CARAFE upsample P5→P4 scale
+                                       #     (512 = actual width-scaled channels from SPPF)
+  - [[-1, 6], 1, Concat, [1]]          # 13  cat P4 C2f (layer 6)
+  - [-1, 3, C2f, [512]]                # 14
+
+  - [-1, 1, CARAFE, [256]]             # 15  CARAFE upsample P4→P3 scale
+                                       #     (256 = actual width-scaled channels from layer 14)
+  - [[-1, 4], 1, Concat, [1]]          # 16  cat P3 C2f (layer 4)
+  - [-1, 3, C2f, [256]]                # 17  P3/8-small  ← detect
+
+  - [-1, 1, Conv, [256, 3, 2]]         # 18
+  - [[-1, 14], 1, Concat, [1]]         # 19  cat head P4 (layer 14)
+  - [-1, 3, C2f, [512]]                # 20  P4/16-medium ← detect
+
+  - [-1, 1, Conv, [512, 3, 2]]         # 21
+  - [[-1, 11], 1, Concat, [1]]         # 22  cat SPPF (layer 11)
+  - [-1, 3, C2f, [1024]]               # 23  P5/32-large  ← detect
+
+  - [[17, 20, 23], 1, Detect, [nc]]    # 24  Detect(P3, P4, P5)

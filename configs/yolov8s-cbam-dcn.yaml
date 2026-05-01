@@ -1,0 +1,48 @@
+# Model C: YOLOv8s + CBAM + DCNv2
+# AquaDebris-Net ablation — adds deformable convolutions at P4 and P5.
+#
+# C2f_DCN replaces C2f at backbone layers 6 and 9 (P4/16 and P5/32).
+# Each BottleneckDCN inside C2f_DCN uses a learnable offset network that
+# shifts the 9 sampling positions of the 3x3 conv to match irregular
+# debris shapes (deformed plastic, tangled nets, crushed cans, etc.).
+#
+# CBAM is still applied after each C2f_DCN for attention refinement.
+# Head is identical to yolov8s-cbam.yaml (same layer indices).
+
+nc: 3
+scales:
+  s: [0.33, 0.50, 1024]
+
+backbone:
+  # [from, repeats, module, args]
+  - [-1, 1, Conv, [64, 3, 2]]          # 0  P1/2
+  - [-1, 1, Conv, [128, 3, 2]]         # 1  P2/4
+  - [-1, 3, C2f, [128, True]]          # 2
+  - [-1, 1, Conv, [256, 3, 2]]         # 3  P3/8
+  - [-1, 6, C2f, [256, True]]          # 4  P3 features (neck skip)
+  - [-1, 1, Conv, [512, 3, 2]]         # 5  P4/16
+  - [-1, 6, C2f_DCN, [512, True]]      # 6  P4 with deformable conv
+  - [-1, 1, CBAM, [512]]               # 7  CBAM @ P4
+  - [-1, 1, Conv, [1024, 3, 2]]        # 8  P5/32
+  - [-1, 3, C2f_DCN, [1024, True]]     # 9  P5 with deformable conv
+  - [-1, 1, CBAM, [1024]]              # 10 CBAM @ P5
+  - [-1, 1, SPPF, [1024, 5]]           # 11
+
+head:
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]  # 12
+  - [[-1, 6], 1, Concat, [1]]                    # 13  cat P4 (layer 6)
+  - [-1, 3, C2f, [512]]                          # 14
+
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]  # 15
+  - [[-1, 4], 1, Concat, [1]]                    # 16  cat P3 (layer 4)
+  - [-1, 3, C2f, [256]]                          # 17  P3/8-small  ← detect
+
+  - [-1, 1, Conv, [256, 3, 2]]                   # 18
+  - [[-1, 14], 1, Concat, [1]]                   # 19  cat head P4 (layer 14)
+  - [-1, 3, C2f, [512]]                          # 20  P4/16-medium ← detect
+
+  - [-1, 1, Conv, [512, 3, 2]]                   # 21
+  - [[-1, 11], 1, Concat, [1]]                   # 22  cat SPPF (layer 11)
+  - [-1, 3, C2f, [1024]]                         # 23  P5/32-large  ← detect
+
+  - [[17, 20, 23], 1, Detect, [nc]]              # 24  Detect(P3, P4, P5)
