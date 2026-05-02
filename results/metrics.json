@@ -1,0 +1,38 @@
+[
+  {
+    "name": "Model A \u2014 YOLOv8s baseline",
+    "P": 95.9,
+    "R": 94.1,
+    "mAP50": 98.1,
+    "mAP5095": 78.3,
+    "params": 11.13,
+    "gflops": 28.4
+  },
+  {
+    "name": "Model B \u2014 + CBAM",
+    "P": 94.4,
+    "R": 93.1,
+    "mAP50": 96.9,
+    "mAP5095": 76.6,
+    "params": 11.46,
+    "gflops": 28.7
+  },
+  {
+    "name": "Model C \u2014 + CBAM + DCNv2",
+    "P": 97.0,
+    "R": 94.2,
+    "mAP50": 98.2,
+    "mAP5095": 78.9,
+    "params": 11.58,
+    "gflops": 27.3
+  },
+  {
+    "name": "Model D \u2014 + CBAM + DCNv2 + CARAFE",
+    "P": 96.2,
+    "R": 94.1,
+    "mAP50": 98.2,
+    "mAP5095": 78.4,
+    "params": 11.75,
+    "gflops": 27.6
+  }
+]
