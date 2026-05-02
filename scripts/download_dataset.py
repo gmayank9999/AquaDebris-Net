@@ -12,11 +12,13 @@ import os
 import zipfile
 import shutil
 import urllib.request
+import requests
 
 DATASET_URL = (
     "https://conservancy.umn.edu/bitstreams/"
-    "7a1d2b70-e088-4327-aaca-6cd53e06ad20/download"
+    "0239b06a-512e-49c3-80aa-ba33371e11de/download"
 )
+ITEM_PAGE = "https://conservancy.umn.edu/items/c34b2945-4052-48fa-b7e7-ce0fba2fe649"
 ZIP_PATH = "Trash_ICRA19.zip"
 EXTRACT_DIR = "Trash-ICRA19-raw"
 FINAL_DIR = "Trash-ICRA19"
@@ -24,12 +26,22 @@ FINAL_DIR = "Trash-ICRA19"
 
 def download_with_progress(url, dest):
     print(f"Downloading dataset to {dest} ...")
-
-    def _progress(count, block_size, total_size):
-        pct = count * block_size * 100 / total_size
-        print(f"\r  {min(pct, 100):.1f}%", end="", flush=True)
-
-    urllib.request.urlretrieve(url, dest, reporthook=_progress)
+    session = requests.Session()
+    session.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+    # Visit item page first to get session cookies
+    session.get(ITEM_PAGE)
+    r = session.get(url, stream=True, allow_redirects=True)
+    r.raise_for_status()
+    total = int(r.headers.get("Content-Length", 0))
+    downloaded = 0
+    with open(dest, "wb") as f:
+        for chunk in r.iter_content(chunk_size=1 << 20):  # 1 MB chunks
+            f.write(chunk)
+            downloaded += len(chunk)
+            if total:
+                print(f"\r  {downloaded*100/total:.1f}%  ({downloaded>>20} MB / {total>>20} MB)", end="", flush=True)
+            else:
+                print(f"\r  {downloaded>>20} MB downloaded", end="", flush=True)
     print()
 
 
@@ -93,7 +105,9 @@ def verify_dataset(final_dir):
 
 
 if __name__ == "__main__":
-    if not os.path.exists(FINAL_DIR + "/images/train"):
+    train_imgs = os.path.join(FINAL_DIR, "images", "train")
+    has_images = os.path.exists(train_imgs) and len(os.listdir(train_imgs)) > 0
+    if not has_images:
         if not os.path.exists(ZIP_PATH):
             download_with_progress(DATASET_URL, ZIP_PATH)
         else:

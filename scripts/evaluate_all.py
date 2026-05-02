@@ -15,10 +15,10 @@ from pathlib import Path
 from ultralytics import YOLO
 
 MODELS = [
-    ("Model A — YOLOv8s baseline",    "runs/detect/model_A_baseline/weights/best.pt"),
-    ("Model B — + CBAM",              "runs/detect/model_B_cbam/weights/best.pt"),
-    ("Model C — + CBAM + DCNv2",      "runs/detect/model_C_cbam_dcn/weights/best.pt"),
-    ("Model D — + CBAM + DCNv2 + CARAFE", "runs/detect/model_D_aquadebris/weights/best.pt"),
+    ("Model A — YOLOv8s baseline",    "runs/detect/runs/detect/model_A_baseline/weights/best.pt"),
+    ("Model B — + CBAM",              "runs/detect/runs/model_B_cbam/weights/best.pt"),
+    ("Model C — + CBAM + DCNv2",      "runs/detect/runs/model_C_cbam_dcn/weights/best.pt"),
+    ("Model D — + CBAM + DCNv2 + CARAFE", "runs/detect/runs/model_D_aquadebris/weights/best.pt"),
 ]
 
 PAPER_ROWS = [

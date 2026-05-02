@@ -13,7 +13,34 @@ Run:
     python scripts/train_cbam_dcn.py
 """
 
+import sys
+import os
 from ultralytics import YOLO
+
+
+class TeeLogger:
+    """Tees stdout+stderr to a log file and the original streams simultaneously."""
+    def __init__(self, log_path):
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+        self._log = open(log_path, "w", encoding="utf-8", buffering=1)
+        self._stdout = sys.stdout
+        self._stderr = sys.stderr
+        sys.stdout = self
+        sys.stderr = self
+
+    def write(self, msg):
+        self._stdout.write(msg)
+        self._log.write(msg)
+
+    def flush(self):
+        self._stdout.flush()
+        self._log.flush()
+
+    def close(self):
+        sys.stdout = self._stdout
+        sys.stderr = self._stderr
+        self._log.close()
+
 
 COMMON = dict(
     data="trash_icra19.yaml",
@@ -39,6 +66,7 @@ COMMON = dict(
     mosaic=1.0,
     mixup=0.1,
     patience=20,
+    save_period=10,
     device=0,
     workers=8,
     seed=42,
@@ -46,14 +74,17 @@ COMMON = dict(
 )
 
 if __name__ == "__main__":
-    model = YOLO("configs/yolov8s-cbam-dcn.yaml")
-    model.load("yolov8s.pt")
-
-    results = model.train(
-        project="runs/detect",
-        name="model_C_cbam_dcn",
-        exist_ok=True,
-        **COMMON,
-    )
-    print("\n=== Model C (CBAM + DCNv2) Training Complete ===")
-    print(f"Best weights: runs/detect/model_C_cbam_dcn/weights/best.pt")
+    logger = TeeLogger("logs/model_C_cbam_dcn.log")
+    try:
+        model = YOLO("configs/yolov8s-cbam-dcn.yaml")
+        model.load("yolov8s.pt")
+        results = model.train(
+            project="runs",
+            name="model_C_cbam_dcn",
+            exist_ok=True,
+            **COMMON,
+        )
+        print("\n=== Model C (CBAM + DCNv2) Training Complete ===")
+        print(f"Best weights: runs/detect/model_C_cbam_dcn/weights/best.pt")
+    finally:
+        logger.close()

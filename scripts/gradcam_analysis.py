@@ -33,10 +33,10 @@ except ImportError:
 
 
 MODELS = [
-    ("A_baseline",    "runs/detect/model_A_baseline/weights/best.pt"),
-    ("B_cbam",        "runs/detect/model_B_cbam/weights/best.pt"),
-    ("C_cbam_dcn",    "runs/detect/model_C_cbam_dcn/weights/best.pt"),
-    ("D_aquadebris",  "runs/detect/model_D_aquadebris/weights/best.pt"),
+    ("A_baseline",    "runs/detect/runs/detect/model_A_baseline/weights/best.pt"),
+    ("B_cbam",        "runs/detect/runs/model_B_cbam/weights/best.pt"),
+    ("C_cbam_dcn",    "runs/detect/runs/model_C_cbam_dcn/weights/best.pt"),
+    ("D_aquadebris",  "runs/detect/runs/model_D_aquadebris/weights/best.pt"),
 ]
 
 OUTPUT_DIR = Path("results/gradcam_visualizations")
@@ -97,19 +97,38 @@ def run_eigencam(model_path, img_paths, model_tag):
     pytorch_model = model.model
     pytorch_model.eval()
 
+    # Wrap model so it returns a tensor, not a tuple (YOLO detection returns tuple)
+    class ModelWrapper(torch.nn.Module):
+        def __init__(self, m):
+            super().__init__()
+            self.m = m
+        def forward(self, x):
+            out = self.m(x)
+            if isinstance(out, (tuple, list)):
+                # detection head outputs: first element is the main tensor
+                for o in out:
+                    if isinstance(o, torch.Tensor):
+                        return o
+                return out[0]
+            return out
+
+    wrapped = ModelWrapper(pytorch_model)
+
     out_dir = OUTPUT_DIR / model_tag
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    # Move to GPU before creating EigenCAM
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    wrapped = wrapped.to(device)
+
     # Target the last C2f block in the backbone (before SPPF)
-    # For standard YOLOv8s: model.model.model[8] is the last C2f
-    # For our custom models with CBAM, SPPF is at index 11 → last C2f is index 9
     try:
         target_layer = [pytorch_model.model[-2]]  # second to last backbone block
     except Exception:
         target_layer = [list(pytorch_model.modules())[-5]]
 
     try:
-        cam = EigenCAM(pytorch_model, target_layer, use_cuda=torch.cuda.is_available())
+        cam = EigenCAM(wrapped, target_layer)
     except Exception as e:
         print(f"  EigenCAM init failed ({e}), falling back to predictions only.")
         run_gradcam_ultralytics(model_path, img_paths, model_tag)
@@ -118,9 +137,7 @@ def run_eigencam(model_path, img_paths, model_tag):
     for img_path in img_paths:
         stem = Path(img_path).stem
         img_bgr, img_rgb, img_f32, tensor = preprocess(img_path)
-
-        if torch.cuda.is_available():
-            tensor = tensor.cuda()
+        tensor = tensor.to(device)
 
         try:
             grayscale_cam = cam(input_tensor=tensor)[0]

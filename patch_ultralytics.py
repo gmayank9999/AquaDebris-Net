@@ -64,8 +64,13 @@ class BottleneckDCN(nn.Module):
     def forward(self, x):
         identity = x
         feat = self.cv1(x)
-        om = self.offset_conv(feat)
-        out = self.dcn(feat, om[:, :18], torch.sigmoid(om[:, 18:]))
+        if feat.device.type == "cpu":
+            # CPU fallback for thop FLOPs profiling — DeformConv2d has no CPU kernel.
+            # This path is never hit during real GPU training.
+            out = _F.conv2d(feat, self.dcn.weight, padding=1)
+        else:
+            om = self.offset_conv(feat)
+            out = self.dcn(feat, om[:, :18], torch.sigmoid(om[:, 18:]))
         out = self.act(self.bn(out))
         return out + identity if self.add else out
 
